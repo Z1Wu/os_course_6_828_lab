@@ -70,6 +70,8 @@ CC	:= $(GCCPREFIX)gcc -pipe
 AS	:= $(GCCPREFIX)as
 AR	:= $(GCCPREFIX)ar
 LD	:= $(GCCPREFIX)ld
+# gdb
+MY_GDB := $(GCCPREFIX)gdb
 OBJCOPY	:= $(GCCPREFIX)objcopy
 OBJDUMP	:= $(GCCPREFIX)objdump
 NM	:= $(GCCPREFIX)nm
@@ -148,7 +150,7 @@ QEMUOPTS += $(QEMUEXTRA)
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
 
 gdb:
-	gdb -n -x .gdbinit
+	$(MY_GDB) -n -x .gdbinit
 
 pre-qemu: .gdbinit
 
