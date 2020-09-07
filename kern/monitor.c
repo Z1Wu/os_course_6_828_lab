@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -24,6 +25,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+    { "show_mappings", "Show memory mapping", mon_mem_mappings}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -61,7 +63,44 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+/**
+ * hex to int
+**/
+uint32_t xtoi(char* buf) {
+	uint32_t res = 0;
+	buf += 2; //0x...
+	while (*buf) { 
+		if (*buf >= 'a') *buf = *buf-'a'+'0'+10;//aha
+		res = res*16 + *buf - '0';
+		++buf;
+	}
+	return res;
+}
 
+void pprint(pte_t *pte) {
+	cprintf("PTE_P: %x, PTE_W: %x, PTE_U: %x\n", 
+		*pte&PTE_P, *pte&PTE_W, *pte&PTE_U);
+}
+
+int
+mon_mem_mappings(int argc, char **argv, struct Trapframe *tf)
+{
+    if (argc == 1) {
+        cprintf("Usage: showmappings 0xbegin_addr 0xend_addr\n");
+        return 0;
+    }
+	uint32_t begin = xtoi(argv[1]), end = xtoi(argv[2]);
+	cprintf("begin: %x, end: %x\n", begin, end);
+	for (; begin <= end; begin += PGSIZE) {
+		pte_t *pte = pgdir_walk(kern_pgdir, (void *) begin, 1);	//create
+		if (!pte) panic("boot_map_region panic, out of memory");
+		if (*pte & PTE_P) {
+			cprintf("page %x with ", begin);
+			pprint(pte);
+		} else cprintf("page not exist: %x\n", begin);
+	}
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 
