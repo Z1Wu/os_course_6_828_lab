@@ -26,7 +26,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
-    { "show_mappings", "Show memory mapping", mon_mem_mappings}
+    { "show_mappings", "Show memory mapping", mon_mem_mappings},
+    { "backtrace", "Show backtrace stack", mon_backtrace}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -61,6 +62,34 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+    // uint32_t* ebp = (uint32_t*) read_ebp();
+	// cprintf("Stack backtrace:\n");
+	// while (ebp) {
+	// 	cprintf("ebp %x  eip %x  args", ebp, ebp[1]);
+	// 	int i;
+	// 	for (i = 2; i <= 6; ++i)
+	// 		cprintf(" %08.x", ebp[i]);
+	// 	cprintf("\n");
+	// 	ebp = (uint32_t*) *ebp;
+	// }
+    uint32_t* ebp = (uint32_t*) read_ebp();
+	cprintf("Stack backtrace:\n");
+	while (ebp) {
+		uint32_t eip = ebp[1];
+		cprintf("ebp %x  eip %x  args", ebp, eip);
+		int i;
+		for (i = 2; i <= 6; ++i)
+			cprintf(" %08.x", ebp[i]);
+		cprintf("\n");
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip, &info);
+		cprintf("\t%s:%d: %.*s+%d\n", 
+			info.eip_file, info.eip_line,
+			info.eip_fn_namelen, info.eip_fn_name,
+			eip-info.eip_fn_addr);
+//         kern/monitor.c:143: monitor+106
+		ebp = (uint32_t*) *ebp;
+    }
 	return 0;
 }
 
@@ -150,18 +179,19 @@ runcmd(char *buf, struct Trapframe *tf)
 void
 monitor(struct Trapframe *tf)
 {
-	char *buf;
+    char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
-	cprintf("Type 'help' for a list of commands.\n");
+    cprintf("Welcome to the JOS kernel monitor!\n");
+    cprintf("Type 'help' for a list of commands.\n");
 
-	if (tf != NULL)
-		print_trapframe(tf);
-  int x = 1, y = 3, z = 4;
-  cprintf("x %d, y %x, z %d\n", x, y, z);
+    if (tf != NULL)
+        print_trapframe(tf);
+        
+    // int x = 1, y = 3, z = 4;
+    // cprintf("x %d, y %x, z %d\n", x, y, z);
 
-  unsigned int i = 0x00646c72;
-  cprintf("H%x Wo%s", 57616, &i);
+    // unsigned int i = 0x00646c72;
+    // cprintf("H%x Wo%s", 57616, &i);
 
 	while (1) {
 		buf = readline("K> ");
