@@ -110,7 +110,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 
 // Mark all environments in 'envs' as free, set their env_ids to 0,
 // and insert them into the env_free_list.
-// Make sure the environments are in the free list in the same order
+// Make sure the environments are in the free list in the * same order *
 // they are in the envs array (i.e., so that the first call to
 // env_alloc() returns envs[0]).
 //
@@ -120,11 +120,20 @@ env_init(void)
 	// Set up envs array
 	// LAB 3: Your code here.
 
+    env_free_list = NULL;
+    for(int i = NENV - 1; i >= 0; i--) {
+        envs[i].env_id = 0; // set env_ids to 0
+        // insert to env_free_list
+        envs[i].env_link = env_free_list;
+        envs[i].env_status = ENV_FREE;
+        env_free_list = &envs[i];
+    }
+
 	// Per-CPU part of the initialization
-	env_init_percpu();
+	env_init_percpu(); // TODO usage
 }
 
-// Load GDT and segment descriptors.
+// Load GDT and segment descriptors. 
 void
 env_init_percpu(void)
 {
@@ -182,7 +191,18 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+    p->pp_ref ++;
+    e->env_pgdir = (pde_t *) page2kva(p); // TODO: why use page2kva here
+    
+    for(int i = 0; i < PDX(UTOP); i++) { // for page 
+        e->env_pgdir[i] = 0;
+    }
 
+    //Map the directory above UTOP
+    for(i = PDX(UTOP); i < NPDENTRIES; i++) {
+        e->env_pgdir[i] = kern_pgdir[i];
+    }
+    
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -255,7 +275,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_ipc_recving = 0;
 
 	// commit the allocation
-	env_free_list = e->env_link;
+	env_free_list = e->env_link; // env_free_list point to next free env
 	*newenv_store = e;
 
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
@@ -279,6 +299,21 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+    void* start = (void *)ROUNDDOWN((uint32_t)va, PGSIZE); // phsical memory can only be mapped in granularity of page
+    void* end = (void *)ROUNDUP((uint32_t)va+len, PGSIZE);
+    struct PageInfo *p = NULL;
+    void* i;
+    int r;
+     for(i=start; i<end; i+=PGSIZE){
+         p = page_alloc(0);
+         if(p == NULL)
+             panic(" region alloc, allocation failed.");
+ 
+         r = page_insert(e->env_pgdir, p, i, PTE_W | PTE_U);
+         if(r != 0) {
+             panic("region alloc error");
+         }
+     }
 }
 
 //
@@ -335,6 +370,31 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+    struct Elf *ELFHDR = (struct Elf *) binary;
+	struct Proghdr *ph, *eph;
+
+	if (ELFHDR->e_magic != ELF_MAGIC)
+		panic("Not executable!");
+	
+	ph = (struct Proghdr *) ((uint8_t *) ELFHDR + ELFHDR->e_phoff);
+	eph = ph + ELFHDR->e_phnum;
+	
+	lcr3(PADDR(e->env_pgdir)); // load binary into this env 
+
+	for (; ph < eph; ph++)
+		if (ph->p_type == ELF_PROG_LOAD) {
+			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+			memset((void *)ph->p_va, 0, ph->p_memsz);
+			memcpy((void *)ph->p_va, binary+ph->p_offset, ph->p_filesz);
+		}
+
+	//we can use this because kern_pgdir is a subset of e->env_pgdir
+	lcr3(PADDR(kern_pgdir));
+
+	e->env_tf.tf_eip = ELFHDR->e_entry;
+	//we should set eip to make sure env_pop_tf runs correctly
+
+	region_alloc(e, (void *) (USTACKTOP - PGSIZE), PGSIZE);
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
@@ -353,6 +413,9 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+    struct Env *penv;
+	env_alloc(&penv, 0);
+	load_icode(penv, binary);
 }
 
 //
@@ -446,8 +509,8 @@ env_pop_tf(struct Trapframe *tf)
 	curenv->env_cpunum = cpunum();
 
 	asm volatile(
-		"\tmovl %0,%%esp\n"
-		"\tpopal\n"
+		"\tmovl %0,%%esp\n" // 把 esp 指向 tf 的地址，利用栈是向下延伸的特性，让 tf 结构体的对象，变成栈桢内的对象。
+		"\tpopal\n" 
 		"\tpopl %%es\n"
 		"\tpopl %%ds\n"
 		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
@@ -472,7 +535,7 @@ env_run(struct Env *e)
 	//	   2. Set 'curenv' to the new environment,
 	//	   3. Set its status to ENV_RUNNING,
 	//	   4. Update its 'env_runs' counter,
-	//	   5. Use lcr3() to switch to its address space.
+	//	   5. Use lcr3() to switch to its address space. 修改地址空间
 	// Step 2: Use env_pop_tf() to restore the environment's
 	//	   registers and drop into user mode in the
 	//	   environment.
@@ -483,7 +546,22 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+    // curenv
+    // if (curenv == NULL) {
+    //     curenv = e;
+    // } else {
+    //     curenv->env_status = ENV_RUNNABLE;
+    //     curenv = e;
+    // }
+    // curenv->env_status = ENV_RUNNING;
+    // curenv->env_runs += 1;
+    // lcr3(PADDR(curenv->env_pgdir));
+    if (e->env_status == ENV_RUNNING) // 
+		e->env_status = ENV_RUNNABLE;
+	curenv = e;
+	e->env_status = ENV_RUNNING;
+	e->env_runs++;
+	lcr3(PADDR(e->env_pgdir)); // lcr3 need use phsical address
+	env_pop_tf(&e->env_tf);
 }
 
