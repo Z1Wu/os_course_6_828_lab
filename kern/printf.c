@@ -25,10 +25,10 @@ vcprintf(const char *fmt, va_list ap)
 int
 cprintf(const char *fmt, ...)
 {
-	va_list ap;
+	va_list ap; // an object hold the information of variable number of parameters
 	int cnt;
 
-	va_start(ap, fmt);
+	va_start(ap, fmt); // initial the va object 
 	cnt = vcprintf(fmt, ap);
 	va_end(ap);
 

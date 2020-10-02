@@ -273,7 +273,11 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+    // percpu_kstacks
+    // NCPU
+    for(int i = 0; i < NCPU; i ++) { //  KSTACKTOP already mapped to bootstack, and bootstack don't have KSTKGAP 
+        boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE - i  * (KSTKSIZE + KSTKGAP), KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
+    }
 }
 
 // --------------------------------------------------------------
@@ -315,10 +319,15 @@ page_init(void)
 
     size_t i;
     size_t npage_ext_free = ROUNDUP((uint32_t)boot_alloc(0) - KERNBASE, PGSIZE) / PGSIZE;
+    // page number of 
+	// extern unsigned char mpentry_start[], mpentry_end[]; // this two symbols defined in mpentry.S
+    // size_t mp_e_beign = PGNUM(mpentry_start), mp_e_end = PGNUM(mpentry_end);
     for (i = 0; i < npages; i++) {
         if( i == 0 ) { // first page
             pages[i].pp_ref = 1;
         } else if ( i >= npages_basemem && i < npage_ext_free) { // io hole and extended memory in use
+            pages[i].pp_ref = 1;
+        } else  if (i == PGNUM(MPENTRY_PADDR)) {
             pages[i].pp_ref = 1;
         } else {
             pages[i].pp_ref = 0;
@@ -618,7 +627,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+    pa = ROUNDDOWN(pa, PGSIZE);
+    size = ROUNDUP(pa + size, PGSIZE) - pa; // size maybe change if the address don't align with page
+    if (base + size > MMIOLIM) {
+        panic("overflow\n");
+    }
+    boot_map_region(kern_pgdir, base, size, pa, PTE_PCD | PTE_PWT | PTE_W);
+    base += size;
+    return (void*)(base - size);
 }
 
 static uintptr_t user_mem_check_addr;

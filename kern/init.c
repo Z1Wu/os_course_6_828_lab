@@ -68,13 +68,13 @@ void *mpentry_kstack;
 static void
 boot_aps(void)
 {
-	extern unsigned char mpentry_start[], mpentry_end[];
+	extern unsigned char mpentry_start[], mpentry_end[]; // this two symbols defined in mpentry.S
 	void *code;
 	struct CpuInfo *c;
 
 	// Write entry code to unused memory at MPENTRY_PADDR
 	code = KADDR(MPENTRY_PADDR);
-	memmove(code, mpentry_start, mpentry_end - mpentry_start);
+	memmove(code, mpentry_start, mpentry_end - mpentry_start); // move code to 
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
