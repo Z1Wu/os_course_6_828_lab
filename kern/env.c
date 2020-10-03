@@ -482,13 +482,15 @@ env_destroy(struct Env *e)
 void
 env_pop_tf(struct Trapframe *tf)
 {
+    // 进入用户模式是指这里把段寄存器改变了，特别是修改了 cs 寄存器，通过修改 code segment register 会修改
+    // internal current privilege level
 	asm volatile(
 		"\tmovl %0,%%esp\n" // 把 esp 指向 tf 的地址，利用栈是向下延伸的特性，让 tf 结构体的对象，变成栈桢内的对象。
 		"\tpopal\n" 
 		"\tpopl %%es\n"
 		"\tpopl %%ds\n"
 		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret\n"
+		"\tiret\n" // 这里的 iret，是用来跳过 tf_err，直接把 eip 设置为 tf_eip
 		: : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }
