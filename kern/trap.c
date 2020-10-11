@@ -140,7 +140,7 @@ trap_init_percpu(void)
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
     size_t cpu_idx = thiscpu->cpu_id;
-	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - KSTKSIZE - cpu_idx * (KSTKSIZE + KSTKGAP);
+	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - cpu_idx * (KSTKSIZE + KSTKGAP); // 每一个栈顶的位置
 	thiscpu->cpu_ts.ts_ss0 = GD_KD;
 	thiscpu->cpu_ts.ts_iomb = sizeof(struct Taskstate);
 
@@ -229,7 +229,6 @@ trap_dispatch(struct Trapframe *tf)
         tf->tf_regs.reg_eax = ret;
         return;
     }
-
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
@@ -279,12 +278,13 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+        lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);
-			curenv = NULL;
+			curenv = NULL;  
 			sched_yield();
 		}
 
@@ -320,16 +320,18 @@ page_fault_handler(struct Trapframe *tf)
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
+    // cprintf("in page fault hanlder \n");
 
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-    if ((tf->tf_cs&3) == 0) // lower bit of code segment
+    // cprintf('%d', tf->tf_cs & 3);
+    if ((tf->tf_cs & 3) == 0) {
         cprintf("[%08x] user fault va %08x ip %08x\n",
             curenv->env_id, fault_va, tf->tf_eip);
         print_trapframe(tf);
 		panic("Kernel page fault!");
-
+    }
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 
@@ -363,8 +365,39 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+    // use env_run to invoke 
+    if( curenv->env_pgfault_upcall ) { // 检查是否有注册 user-level pgfault call
+        struct UTrapframe* utf;
+        uintptr_t utf_addr; // esp of user fault stack
+        // page fault may occur during handler
+        if (UXSTACKTOP-PGSIZE<=tf->tf_esp && tf->tf_esp<=UXSTACKTOP-1) // 判断这个 page fault 是在哪里发生的,
+            // 如果是在处理 user-env 的pagefault 是发生新的 page fault 
+            // 在原来的 user-exception stack 的基础上在压入新的 task frame
+            // push 一次是 4 bytes
+            // TODO: 这里多压入的一个 word 的作用，因为后续的进入
+			utf_addr = tf->tf_esp - sizeof(struct UTrapframe) - 4;
+		else 
+			utf_addr = UXSTACKTOP - sizeof(struct UTrapframe);
+        // check whether the exception stack is allocated
+		user_mem_assert(curenv, (void*)utf_addr, 1, PTE_W);//1 is enough
+
+		utf = (struct UTrapframe *) utf_addr;
+		utf->utf_fault_va = fault_va; 
+		utf->utf_err = tf->tf_err;
+		utf->utf_regs = tf->tf_regs;
+		utf->utf_eip = tf->tf_eip;
+		utf->utf_eflags = tf->tf_eflags;
+		utf->utf_esp = tf->tf_esp;
+
+        // 执行注册的回调函数，通过设置 tf_esp 切换栈
+        // 通过注册 env_tf.tf_eip 设置函数的 entry point
+        curenv->env_tf.tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+        curenv->env_tf.tf_esp = utf_addr;
+        env_run(curenv);
+    }
 
 	// Destroy the environment that caused the fault.
+    cprintf("env_pgfualt handler is not set,quit \n");
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 		curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);

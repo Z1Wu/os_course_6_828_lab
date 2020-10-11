@@ -523,7 +523,7 @@ env_pop_tf(struct Trapframe *tf)
 // Context switch from curenv to env e.
 // Note: if this is the first call to env_run, curenv is NULL.
 //
-// This function does not return.
+// * This function does not return. *
 //
 void
 env_run(struct Env *e)
@@ -546,22 +546,25 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-    // curenv
-    // if (curenv == NULL) {
-    //     curenv = e;
-    // } else {
-    //     curenv->env_status = ENV_RUNNABLE;
-    //     curenv = e;
-    // }
-    // curenv->env_status = ENV_RUNNING;
-    // curenv->env_runs += 1;
-    // lcr3(PADDR(curenv->env_pgdir));
-    if (e->env_status == ENV_RUNNING) // 
-		e->env_status = ENV_RUNNABLE;
-	curenv = e;
-	e->env_status = ENV_RUNNING;
-	e->env_runs++;
-	lcr3(PADDR(e->env_pgdir)); // lcr3 need use phsical address
+
+    // if (curenv && curenv->env_status == ENV_RUNNING)
+	// 		curenv->env_status = ENV_RUNNABLE;
+	// curenv = e;
+	// e->env_status = ENV_RUNNING;
+	// e->env_runs++;
+	// lcr3(PADDR(e->env_pgdir)); // lcr3 need use phsical address
+    // unlock_kernel(); 
+	// env_pop_tf(&e->env_tf); // 其中有一个操作会设置 cs 寄存器，这个操作会让 env drop into user mode
+
+    if (curenv != e) {
+        if (curenv && curenv->env_status == ENV_RUNNING)
+            curenv->env_status = ENV_RUNNABLE;
+            curenv = e;
+            e->env_status = ENV_RUNNING;
+            e->env_runs++;
+            lcr3(PADDR(e->env_pgdir));
+    }
+	unlock_kernel();
 	env_pop_tf(&e->env_tf);
 }
 
