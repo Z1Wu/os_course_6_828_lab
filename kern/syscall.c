@@ -22,7 +22,9 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
-
+    struct Env *e;
+	envid2env(curenv->env_id, &e, 1);
+	user_mem_assert(e, s, len, PTE_U);
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
 }
@@ -134,9 +136,12 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 	// LAB 4: Your code here.
     struct Env* e;
     int ret = envid2env(envid, &e, true);
-    if( ret || e->env_id != curenv->env_id )
+    // if( ret || e->env_id != curenv->env_id )
+    if (ret)
         return -E_BAD_ENV;
+    
     e->env_pgfault_upcall = func; // 类似回调函数，在发生 page fault 时回调。
+    cprintf("[%08x] addr of env pgfault %x\n", envid, e->env_pgfault_upcall);
     return 0;
 }
 

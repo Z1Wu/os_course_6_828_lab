@@ -146,7 +146,7 @@ mem_init(void)
 	// following line.)
 
 	// Permissions: kernel R, user R
-	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P; // TODO:Usage
+	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P; // TODO：这个是为了后续方便通过 UVPT 来索引到所有的页表
 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
@@ -163,7 +163,7 @@ mem_init(void)
 	// LAB 3: Your code here.
     int envs_size = NENV * sizeof(struct Env);
     envs = (struct Env*) boot_alloc(envs_size);
-    memset(pages, 0, envs_size);;
+    memset(envs, 0, envs_size);
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -172,7 +172,7 @@ mem_init(void)
 	// memory management will go through the page_* functions. In
 	// particular, we can now map memory using boot_map_region
 	// or page_insert
-	page_init();
+	page_init(); // 初始化 pages，让 pages 和当前的物理内存使用情况对应起来
 
 	check_page_free_list(1);
 	check_page_alloc();
@@ -188,7 +188,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-    boot_map_region(kern_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U);   
+    boot_map_region(kern_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U); 
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -197,6 +197,9 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+    // 能够使用 PADDR 得到物理地址是因为前面设置的 “旧” 的 pgdir 的关系，boot之后已经开启了 paging
+    // 在这里后，envs 这个内核结构的物理地址在内核的 kern_pgdir 中会有两个虚拟地址映射到这里
+    // 一个是上面 envs 创建的时候的虚拟地址，另外一个则是 UENVS，上面的 pages 也是同理
     boot_map_region(kern_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U);  // size defined by memory layout
 
 
@@ -221,6 +224,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+    // 这部分的映射和之前的设置的简单的 page table 一样，这样就能继续使用 PADDR 来计算出 kernel virtual 的物理地址
     boot_map_region(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE, 0, PTE_W);
 
 	// Initialize the SMP-related parts of the memory map
@@ -447,8 +451,8 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
     }  
 
     page_off = PTX(va); // page table index
-    page_base = KADDR(PTE_ADDR(*dic_entry_ptr));
-    return &page_base[page_off];
+    page_base = KADDR(PTE_ADDR(*dic_entry_ptr)); // 找到 va 对应的 pgtable 的地址
+    return &page_base[page_off]; // 索引到对应的 pgtable 中的entry
 }
 
 //
@@ -484,7 +488,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 // should be set to 'perm|PTE_P'.
 //
 // Requirements
-//   - If there is already a page mapped at 'va', it should be page_remove()d.
+//   - If there is already a page mapped at 'va', it should be page_remove().
 //   - If necessary, on demand, a page table should be allocated and inserted
 //     into 'pgdir'.
 //   - pp->pp_ref should be incremented if the insertion succeeds.

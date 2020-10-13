@@ -192,7 +192,7 @@ env_setup_vm(struct Env *e)
 
 	// LAB 3: Your code here.
     p->pp_ref ++;
-    e->env_pgdir = (pde_t *) page2kva(p); // TODO: why use page2kva here
+    e->env_pgdir = (pde_t *) page2kva(p); // 这里是内核维护的数据结构，内核需要记录这个 env 的页表在内核地址空间中的位置
     
     for(int i = 0; i < PDX(UTOP); i++) { // for page 
         e->env_pgdir[i] = 0;
@@ -205,7 +205,7 @@ env_setup_vm(struct Env *e)
     
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
+	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U; // PADDR 只接受 kernel virtual addr
 
 	return 0;
 }

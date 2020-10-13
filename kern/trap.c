@@ -326,6 +326,7 @@ page_fault_handler(struct Trapframe *tf)
 
 	// LAB 3: Your code here.
     // cprintf('%d', tf->tf_cs & 3);
+    // cprintf("%d")
     if ((tf->tf_cs & 3) == 0) {
         cprintf("[%08x] user fault va %08x ip %08x\n",
             curenv->env_id, fault_va, tf->tf_eip);
@@ -397,8 +398,8 @@ page_fault_handler(struct Trapframe *tf)
     }
 
 	// Destroy the environment that caused the fault.
-    cprintf("env_pgfualt handler is not set,quit \n");
-	cprintf("[%08x] user fault va %08x ip %08x\n",
+    cprintf("[%08x] addr of env pgfault %x\n", curenv->env_id,curenv->env_pgfault_upcall);
+	cprintf("[%08x] user fault va %08x ip %08x, not setup user pagefault handler\n",
 		curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);
 	env_destroy(curenv);
