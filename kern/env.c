@@ -392,15 +392,12 @@ load_icode(struct Env *e, uint8_t *binary)
 	//we can use this because kern_pgdir is a subset of e->env_pgdir
 	lcr3(PADDR(kern_pgdir));
 
-	e->env_tf.tf_eip = ELFHDR->e_entry;
 	//we should set eip to make sure env_pop_tf runs correctly
-
-	region_alloc(e, (void *) (USTACKTOP - PGSIZE), PGSIZE);
-
-	// Now map one page for the program's initial stack
+	e->env_tf.tf_eip = ELFHDR->e_entry;
+    
+    // Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
-	// LAB 3: Your code here.
+	region_alloc(e, (void *) (USTACKTOP - PGSIZE), PGSIZE);
 }
 
 //
@@ -414,9 +411,14 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
-
+    struct Env *penv;
+	env_alloc(&penv, 0);
+	load_icode(penv, binary);
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
+    if( type == ENV_TYPE_FS) {
+        penv->env_tf.tf_eflags |= ENV_TYPE_FS;
+    }
 }
 
 //
