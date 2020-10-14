@@ -202,6 +202,25 @@ sys_page_alloc(envid_t envid, void *va, int perm)
     return ret;
 }
 
+
+static int page_map_helper(struct Env* src_env, void* srcva, struct Env* dst_env, void* dstva, int perm) {
+    if ( !check_va(srcva) || !check_va(dstva) ){
+        return E_INVAL;
+    }
+    pte_t* pte; // pte's structure
+    struct PageInfo* pp = page_lookup(src_env->env_pgdir, srcva, &pte);
+    // https://github.com/clann24/jos/blob/master/lab4/partA/kern/syscall.c#L251
+    //	-E_INVAL if perm is inappropriate (see sys_page_alloc).
+	int flag = PTE_U|PTE_P;
+	if ((perm & flag) != flag) return -E_INVAL;
+
+	//	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
+	//		address space.
+	if (((*pte&PTE_W) == 0) && (perm&PTE_W)) return -E_INVAL;
+
+    return page_insert(dst_env->env_pgdir, pp, dstva, perm);
+}
+
 // Map the page of memory at 'srcva' in srcenvid's address space
 // at 'dstva' in dstenvid's address space with permission 'perm'.
 // Perm has the same restrictions as in sys_page_alloc, except
@@ -239,22 +258,23 @@ sys_page_map(envid_t srcenvid, void *srcva,
         return ret;
     }
 
-    if ( !check_va(srcva) || !check_va(dstva) ){
-        return E_INVAL;
-    }
+    return page_map_helper(src_env, srcva, dst_env, dstva, perm);
 
-    pte_t* pte; // pte's structure
-    struct PageInfo* pp = page_lookup(src_env->env_pgdir, srcva, &pte);
-    // https://github.com/clann24/jos/blob/master/lab4/partA/kern/syscall.c#L251
-    //	-E_INVAL if perm is inappropriate (see sys_page_alloc).
-	int flag = PTE_U|PTE_P;
-	if ((perm & flag) != flag) return -E_INVAL;
+    // if ( !check_va(srcva) || !check_va(dstva) ){
+    //     return E_INVAL;
+    // }
+    // pte_t* pte; // pte's structure
+    // struct PageInfo* pp = page_lookup(src_env->env_pgdir, srcva, &pte);
+    // // https://github.com/clann24/jos/blob/master/lab4/partA/kern/syscall.c#L251
+    // //	-E_INVAL if perm is inappropriate (see sys_page_alloc).
+	// int flag = PTE_U|PTE_P;
+	// if ((perm & flag) != flag) return -E_INVAL;
 
-	//	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
-	//		address space.
-	if (((*pte&PTE_W) == 0) && (perm&PTE_W)) return -E_INVAL;
+	// //	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
+	// //		address space.
+	// if (((*pte&PTE_W) == 0) && (perm&PTE_W)) return -E_INVAL;
 
-    return page_insert(dst_env->env_pgdir, pp, dstva, perm);
+    // return page_insert(dst_env->env_pgdir, pp, dstva, perm);
     
 	// LAB 4: Your code here.
 	panic("sys_page_map not implemented");
@@ -323,7 +343,37 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+    struct Env* dst_e;
+    int ret;
+    envid2env(envid, &dst_e, false);
+    if(!dst_e->env_ipc_recving) {
+        return -E_IPC_NOT_RECV;
+    }
+
+    dst_e->env_ipc_recving = false;
+    dst_e->env_ipc_value = value;
+    dst_e->env_status = ENV_RUNNABLE;
+    dst_e->env_ipc_perm = 0;
+    dst_e->env_ipc_from = curenv->env_id;
+
+    // 通过修改 dst_e 的 eax 来构建其对应的返回值
+    dst_e->env_tf.tf_regs.reg_eax = 0;
+
+    if(srcva < (void*)UTOP) {
+        // 这里不能使用直接使用 sys_page_map ， sys_page_map 要检查丹铅的
+        struct Env *dst_env;
+        ret = envid2env(envid, &dst_env, false);
+        if( ret != 0) {
+            return ret;
+        }
+        ret = page_map_helper(curenv, srcva, dst_env, dst_e->env_ipc_dstva, perm);
+        if(ret < 0){
+            return ret;
+        }
+        dst_e->env_ipc_perm = perm;
+    }
+    
+    return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -341,6 +391,18 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
+
+    if ((uint32_t) dstva < UTOP && (void *)ROUNDDOWN(dstva, PGSIZE) != dstva) {
+        return -E_INVAL;
+    }
+    
+    curenv->env_ipc_recving = true;
+    curenv->env_status = ENV_NOT_RUNNABLE; // waiting 
+    if( dstva < (void *)UTOP ) { // if dstva > utop 代表这次 recv 不需要 map
+        curenv->env_ipc_dstva = dstva;
+    }
+    sched_yield(); // give up cpu
+
 	panic("sys_ipc_recv not implemented");
 	return 0;
 }
@@ -380,6 +442,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_env_set_status(a1, a2);
 		case SYS_env_set_pgfault_upcall:
 			return sys_env_set_pgfault_upcall(a1, (void*)a2);
+        case SYS_ipc_recv:
+			return sys_ipc_recv((void *)a1);
+        case SYS_ipc_try_send:
+			return sys_ipc_try_send(a1, a2,(void *)a3, a4);
         default:
             return -E_INVAL;
 	}
