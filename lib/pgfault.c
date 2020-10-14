@@ -24,14 +24,19 @@ void (*_pgfault_handler)(struct UTrapframe *utf);
 void
 set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 {
-	int r;
+	// int r;
 
 	if (_pgfault_handler == 0) {
 		// First time through!
 		// LAB 4: Your code here.
-		panic("set_pgfault_handler not implemented");
+        // allocate a user exception stack
+        // int env_id = sys_getenvid();
+        sys_page_alloc(0, (void *)(UXSTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);
+        // register entry point
+        sys_env_set_pgfault_upcall(0, (void *)_pgfault_upcall);
 	}
 
 	// Save handler pointer for assembly to call.
+    // 这个函数会在 _pgfault_upcall 中被回调
 	_pgfault_handler = handler;
 }
