@@ -103,7 +103,9 @@ duppage(envid_t envid, unsigned pn)
 			panic("2");
 		if (sys_page_map(0, addr, 0, addr, PTE_COW|PTE_U|PTE_P) < 0)
 			panic("3");
-	} else sys_page_map(0, addr, envid, addr, PTE_U|PTE_P);
+	} else {
+        sys_page_map(0, addr, envid, addr, PTE_U|PTE_P);
+    }
 	return 0;
 }
 

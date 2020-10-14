@@ -69,7 +69,8 @@ void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-    void th0();
+    // 这些函数在 trapentry.S 已经被定义好了，这里只是一个声明
+    void th0(); 
     void th1();
     void th3();
     void th4();
@@ -84,7 +85,18 @@ trap_init(void)
     void th13();
     void th14();
     void th16();
+
     void th48();
+    // for irq 
+    void th32();
+    void th33();
+    void th36();
+    void th39();
+    void th46();
+    void th51();
+
+
+
 	// LAB 3: Your code here.
 	SETGATE(idt[0], 0, GD_KT, th0, 0);
 	SETGATE(idt[1], 0, GD_KT, th1, 0);
@@ -102,6 +114,14 @@ trap_init(void)
 	SETGATE(idt[14], 0, GD_KT, th14, 0);
 	SETGATE(idt[16], 0, GD_KT, th16, 0);
 	SETGATE(idt[48], 0, GD_KT, th48, 3); // for system call
+
+	SETGATE(idt[32], 0, GD_KT, th32, 0);
+	SETGATE(idt[33], 0, GD_KT, th33, 0);
+	SETGATE(idt[36], 0, GD_KT, th36, 0);
+	SETGATE(idt[39], 0, GD_KT, th39, 0);
+	SETGATE(idt[46], 0, GD_KT, th46, 0);
+	SETGATE(idt[51], 0, GD_KT, th51, 0);
+
 
 
 	// Per-CPU setup 
@@ -218,6 +238,7 @@ trap_dispatch(struct Trapframe *tf)
     } else if(tf->tf_trapno == T_SYSCALL) {
         // TODO: paramters, return value
         uint32_t sys_call_no = tf->tf_regs.reg_eax;
+        // cprintf("system call: %d \n", sys_call_no);
         uint32_t ret = 0;
         ret = syscall(
             sys_call_no,
@@ -241,6 +262,13 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+    if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		// cprintf("interrupt on irq timer\n");
+        // run a new processs
+        lapic_eoi();
+        sched_yield();
+		return;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -278,6 +306,7 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+        // cprintf("acqurie kernel lock \n");
         lock_kernel();
 		assert(curenv);
 

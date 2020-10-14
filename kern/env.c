@@ -266,7 +266,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// You will set e->env_tf.tf_eip later.
 
 	// Enable interrupts while in user mode.
-	// LAB 4: Your code here.
+	// LAB 4: Your code here
+    e->env_tf.tf_eflags |= FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -507,7 +508,7 @@ env_pop_tf(struct Trapframe *tf)
 {
 	// Record the CPU we are running on for user-space debugging
 	curenv->env_cpunum = cpunum();
-
+    unlock_kernel(); // 为什么需要把 lock 放在这里？
 	asm volatile(
 		"\tmovl %0,%%esp\n" // 把 esp 指向 tf 的地址，利用栈是向下延伸的特性，让 tf 结构体的对象，变成栈桢内的对象。
 		"\tpopal\n" 
@@ -556,15 +557,18 @@ env_run(struct Env *e)
     // unlock_kernel(); 
 	// env_pop_tf(&e->env_tf); // 其中有一个操作会设置 cs 寄存器，这个操作会让 env drop into user mode
 
+    // if(curenv) cprintf("old running env %x  ", curenv->env_id);
+    // else cprintf("first invoke env run");
     if (curenv != e) {
-        if (curenv && curenv->env_status == ENV_RUNNING)
+        if (curenv && curenv->env_status == ENV_RUNNING) {
             curenv->env_status = ENV_RUNNABLE;
-            curenv = e;
-            e->env_status = ENV_RUNNING;
-            e->env_runs++;
-            lcr3(PADDR(e->env_pgdir));
+        }
+        curenv = e; // 包括切换进程和第一次运行进程
+        e->env_status = ENV_RUNNING;
+        e->env_runs++;
+        lcr3(PADDR(e->env_pgdir));
     }
-	unlock_kernel();
+    // cprintf("new running env %x\n", curenv->env_id);
 	env_pop_tf(&e->env_tf);
 }
 
