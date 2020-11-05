@@ -22,7 +22,7 @@ sys_cputs(const char *s, size_t len)
 
 	// LAB 3: Your code here.
     struct Env *e;
-	envid2env(sys_getenvid(), &e, 1);
+	envid2env(0, &e, 1);
 	user_mem_assert(e, s, len, PTE_U);
 
 	// Print the string supplied by the user.
