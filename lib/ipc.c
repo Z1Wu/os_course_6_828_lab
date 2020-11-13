@@ -37,7 +37,9 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
     if(pg && perm_store) {
         *perm_store = thisenv->env_ipc_perm;
     }
-    *from_env_store = thisenv->env_ipc_from;
+    if(from_env_store) {
+        *from_env_store = thisenv->env_ipc_from;
+    }
     return  thisenv->env_ipc_value;
 }
 
@@ -64,6 +66,8 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
         } else if ( ret != -E_IPC_NOT_RECV ) {
             panic("error occur %d", ret);
         }
+        // 到这里说明目前对应的进程没有期望接收信息
+        cprintf("target %d don't expect receive massage give up cpu\n", to_env);
         sys_yield(); // TODO: 为什么需要放弃 CPU，同时这个 send 为什么要放在一个 loop 里面?
     }
 	panic("ipc_send not implemented");

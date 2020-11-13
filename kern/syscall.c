@@ -131,7 +131,19 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	// LAB 5: Your code here.
 	// Remember to check whether the user has supplied us with a good
 	// address!
-	panic("sys_env_set_trapframe not implemented");
+    struct Env* e;
+    int r;
+    r = envid2env(envid, &e, true);
+    if (r < 0 ){
+        return r;
+    }
+    user_mem_assert(e, tf, sizeof(struct Trapframe), PTE_U);
+    // e->env_tf.tf_cs |= GD_UT | 3;
+    // e->env_tf.tf_eflags |= FL_IF;
+    // e->env_tf.tf_eflags |= FL_IOPL_0; // 中断优先级
+    e->env_tf = *tf;
+    return 0;
+	// panic("sys_env_set_trapframe not implemented");
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -202,7 +214,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	if ((perm & flag) != flag) return -E_INVAL;
     if( !check_va(va)) return -E_INVAL;
     struct PageInfo* p = page_alloc(ALLOC_ZERO);
-    p->pp_ref++;
+    // p->pp_ref++;
     if( p == NULL) {
         return -E_NO_MEM;
     }
@@ -217,18 +229,20 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 static int page_map_helper(struct Env* src_env, void* srcva, struct Env* dst_env, void* dstva, int perm) {
     if ( !check_va(srcva) || !check_va(dstva) ){
-        return E_INVAL;
+        return -E_INVAL;
     }
     pte_t* pte; // pte's structure
     struct PageInfo* pp = page_lookup(src_env->env_pgdir, srcva, &pte);
     // https://github.com/clann24/jos/blob/master/lab4/partA/kern/syscall.c#L251
     //	-E_INVAL if perm is inappropriate (see sys_page_alloc).
 	int flag = PTE_U|PTE_P;
-	if ((perm & flag) != flag) return -E_INVAL;
+	if (((perm & flag) != flag)) {
+        return -E_INVAL;
+    }
 
 	//	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
 	//		address space.
-	if (((*pte&PTE_W) == 0) && (perm&PTE_W)) return -E_INVAL;
+	if (((*pte & PTE_W) == 0) && (perm & PTE_W)) return -E_INVAL;
 
     return page_insert(dst_env->env_pgdir, pp, dstva, perm);
 }
@@ -307,6 +321,7 @@ sys_page_unmap(envid_t envid, void *va)
     int ret = envid2env(envid, &e, true);
     if(ret) return ret;
     if( !check_va(va)) return -E_INVAL;
+    // cprintf("env: %d, unmap va %x\n", envid, va);
     page_remove(e->env_pgdir, va);
     return 0;
 	// LAB 4: Your code here.
@@ -372,7 +387,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     dst_e->env_tf.tf_regs.reg_eax = 0;
 
     if(srcva < (void*)UTOP) {
-        // 这里不能使用直接使用 sys_page_map ， sys_page_map 要检查丹铅的
+        // 这里不能使用直接使用 sys_page_map 
         struct Env *dst_env;
         ret = envid2env(envid, &dst_env, false);
         if( ret != 0) {
@@ -458,6 +473,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_ipc_recv((void *)a1);
         case SYS_ipc_try_send:
 			return sys_ipc_try_send(a1, a2,(void *)a3, a4);
+        case SYS_env_set_trapframe:
+            return sys_env_set_trapframe(a1, (struct Trapframe*)a2);
         default:
             return -E_INVAL;
 	}

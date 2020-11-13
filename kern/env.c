@@ -416,8 +416,9 @@ env_create(uint8_t *binary, enum EnvType type)
 	load_icode(penv, binary);
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
-    if( type == ENV_TYPE_FS) {
-        penv->env_tf.tf_eflags |= ENV_TYPE_FS;
+    if(type == ENV_TYPE_FS)  {
+        penv->env_type = ENV_TYPE_FS;
+        penv->env_tf.tf_eflags |= FL_IOPL_MASK;
     }
 }
 
@@ -510,7 +511,7 @@ env_pop_tf(struct Trapframe *tf)
 {
 	// Record the CPU we are running on for user-space debugging
 	curenv->env_cpunum = cpunum();
-    unlock_kernel(); // 为什么需要把 lock 放在这里？
+    unlock_kernel();
 	asm volatile(
 		"\tmovl %0,%%esp\n" // 把 esp 指向 tf 的地址，利用栈是向下延伸的特性，让 tf 结构体的对象，变成栈桢内的对象。
 		"\tpopal\n" 

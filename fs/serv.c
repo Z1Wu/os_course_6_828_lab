@@ -91,7 +91,8 @@ openfile_lookup(envid_t envid, uint32_t fileid, struct OpenFile **po)
 
 	o = &opentab[fileid % MAXOPEN];
 	if (pageref(o->o_fd) <= 1 || o->o_fileid != fileid)
-		return -E_INVAL;
+		// 如果用户进程 unmap fd 对应的的页
+        return -E_INVAL;
 	*po = o;
 	return 0;
 }
@@ -214,7 +215,23 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+    int r;
+    uint32_t n_read = req->req_n;
+	struct OpenFile *o;
+
+    r = openfile_lookup(envid, req->req_fileid, &o);
+    if (r < 0) {
+		return r;
+    }
+
+    r = file_read(o->o_file, ret->ret_buf, n_read, o->o_fd->fd_offset);
+    if (r < 0) {
+        cprintf("error occur when file read %d\n", r);
+        return r;
+    }
+    // if success, update fd offset
+    o->o_fd->fd_offset += r;
+    return r;
 }
 
 
@@ -228,8 +245,22 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	if (debug)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
+    int r;
+    uint32_t n_read = req->req_n;
+	struct OpenFile *o;
+    r = openfile_lookup(envid, req->req_fileid, &o);
+    if (r < 0) {
+		return r;
+    }
+    r = file_write(o->o_file, req->req_buf, req->req_n, o->o_fd->fd_offset);
+    if (r < 0) {
+        cprintf("error occur when file read %d\n", r);
+        return r;
+    }
+    o->o_fd->fd_offset += r;
+    return r;
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	// panic("serve_write not implemented");
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
@@ -336,10 +367,13 @@ umain(int argc, char **argv)
 	// Check that we are able to do I/O
 	outw(0x8A00, 0x8A00);
 	cprintf("FS can do I/O\n");
-
+    cprintf("do serve init \n");
 	serve_init();
+    cprintf("do fs init \n");
 	fs_init();
+    cprintf("do fs test \n");
         fs_test();
+    cprintf("serve \n");
 	serve();
 }
 

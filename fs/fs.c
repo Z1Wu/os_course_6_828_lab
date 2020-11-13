@@ -62,7 +62,15 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+    int blk_num = super->s_nblocks;
+    int i = 0;
+    for(i = 0; i < blk_num; i++) {
+        if(bitmap[i / 32] & (1 << (i % 32)))  { // find a free blk, flush the change into memory
+            bitmap[i/32] &= ~(1 << (i % 32));
+            flush_block((void *)(bitmap+(i / 32)));
+            return i;
+        }
+    }// check block no
 	return -E_NO_DISK;
 }
 
@@ -130,12 +138,32 @@ fs_init(void)
 //	-E_INVAL if filebno is out of range (it's >= NDIRECT + NINDIRECT).
 //
 // Analogy: This is like pgdir_walk for files.
-// Hint: Don't forget to clear any block you allocate.
+// TODO: Hint: Don't forget to clear any block you allocate. 指的是初始化？
 static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
-       // LAB 5: Your code here.
-       panic("file_block_walk not implemented");
+    // LAB 5: Your code here.
+    if( filebno >= (NDIRECT + NINDIRECT)) {
+        panic("invalid filebno");
+        return -E_INVAL;
+    }
+    if( filebno < NDIRECT) { // direct map
+        *ppdiskbno = f->f_direct + filebno;
+        cprintf("%s direct block map filebno %d \n", f->f_name, filebno);
+        return 0;
+    } else { // indirect map
+        if(f->f_indirect == 0 && !alloc) {
+            return -E_NOT_FOUND;
+        } else if (f->f_indirect == 0 && alloc) {
+            // allocate the indirect block
+            f->f_indirect = alloc_block();
+            // 初始化分配的块，因为后续需要通过判断上面的元素是否为 0 来判断这个 slot 上是否被使用。
+            memset(diskaddr(f->f_indirect), 0, BLKSIZE); 
+        }
+        uint32_t* blk_list = (uint32_t *)diskaddr(f->f_indirect);
+        *ppdiskbno = blk_list + (filebno - NDIRECT);
+        return 0;
+    }
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -146,11 +174,29 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 //	-E_INVAL if filebno is out of range.
 //
 // Hint: Use file_block_walk and alloc_block.
+
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
        // LAB 5: Your code here.
-       panic("file_get_block not implemented");
+    uint32_t* p_slot;
+    int r;
+    r = file_block_walk(f, filebno, &p_slot, true);
+    if (r < 0) {
+        return r;
+    }
+    int blk_no = 0;
+    if (p_slot && *p_slot != 0) { // if this slot already have been mapped
+        blk_no = *p_slot;
+    } else { // allocate a block and map that block
+        blk_no = alloc_block();
+    }
+    if(blk_no < 0) {
+        return -E_NO_DISK;
+    }
+    *p_slot = blk_no;
+    *blk = (char *)diskaddr(blk_no);
+    return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
@@ -255,10 +301,13 @@ walk_path(const char *path, struct File **pdir, struct File **pf, char *lastelem
 			return -E_BAD_PATH;
 		memmove(name, p, path - p);
 		name[path - p] = '\0';
+        cprintf("layer: %s", name);
 		path = skip_slash(path);
 
-		if (dir->f_type != FTYPE_DIR)
+		if (dir->f_type != FTYPE_DIR){
+            // cprintf("not dir");
 			return -E_NOT_FOUND;
+        }
 
 		if ((r = dir_lookup(dir, name, &f)) < 0) {
 			if (r == -E_NOT_FOUND && *path == '\0') {
@@ -440,7 +489,7 @@ file_flush(struct File *f)
 		flush_block(diskaddr(*pdiskbno));
 	}
 	flush_block(f);
-	if (f->f_indirect)
+	if (f->f_indirect) // TODO：对于 indirect block 指向的 block 是否也需要 flush into disk ?
 		flush_block(diskaddr(f->f_indirect));
 }
 

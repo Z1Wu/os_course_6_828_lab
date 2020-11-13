@@ -402,8 +402,10 @@ page_free(struct PageInfo *pp)
 void
 page_decref(struct PageInfo* pp)
 {
-	if (--pp->pp_ref == 0)
+    // cprintf("page %x ref drecrese from %d \n",pp, pp->pp_ref);
+	if (--pp->pp_ref == 0) {
 		page_free(pp);
+    }
 }
 
 // Given 'pgdir', a pointer to a page directory, pgdir_walk returns
@@ -514,10 +516,11 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
     pte_t *entry = NULL;
-    entry =  pgdir_walk(pgdir, (void*)va, 1);    //Get the mapping page of this address va.
+    entry = pgdir_walk(pgdir, (void*)va, 1);    //Get the mapping page of this address va.
     if(entry == NULL) return -E_NO_MEM;
 
-    pp->pp_ref++;
+    // 这个顺序比较重要，能够处理这个页已经存在的情况
+    pp->pp_ref++; // 这个是把这个 page 映射到 va，所以这个 page ref 应该增加，
     if((*entry) & PTE_P)             //If this virtual address is already mapped.
     {
         tlb_invalidate(pgdir, va);
