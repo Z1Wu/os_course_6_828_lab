@@ -53,9 +53,17 @@ again:
 			// then check whether 'fd' is 0.
 			// If not, dup 'fd' onto file descriptor 0,
 			// then close the original 'fd'.
-
+			if ((fd = open(t, O_RDONLY)) < 0) {
+				cprintf("open %s for read: %e", t, fd);
+				exit();
+			}
+			
+			if (fd != 0) {
+				dup(fd, 0);
+				close(fd);
+			}
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			// panic("< redirection not implemented");
 			break;
 
 		case '>':	// Output redirection
@@ -312,10 +320,10 @@ umain(int argc, char **argv)
 			panic("fork: %e", r);
 		if (debug)
 			cprintf("FORK: %d\n", r);
-		if (r == 0) {
+		if (r == 0) { // 开启一个新的子进程执行命令
 			runcmd(buf);
 			exit();
-		} else
+		} else // 父进程等待子进程结束
 			wait(r);
 	}
 }

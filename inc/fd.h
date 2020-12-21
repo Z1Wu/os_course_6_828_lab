@@ -28,7 +28,7 @@ struct FdFile {
 };
 
 struct Fd {
-	int fd_dev_id;
+	int fd_dev_id; // 这个 Fd 对应的设备
 	off_t fd_offset;
 	int fd_omode;
 	union {

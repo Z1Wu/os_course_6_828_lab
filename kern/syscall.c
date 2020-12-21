@@ -138,12 +138,11 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
         return r;
     }
     user_mem_assert(e, tf, sizeof(struct Trapframe), PTE_U);
-    // e->env_tf.tf_cs |= GD_UT | 3;
-    // e->env_tf.tf_eflags |= FL_IF;
-    // e->env_tf.tf_eflags |= FL_IOPL_0; // 中断优先级
     e->env_tf = *tf;
+    e->env_tf.tf_cs |= GD_UT | 3; // 运行在用户
+    e->env_tf.tf_eflags |= FL_IF; // 中断
+    e->env_tf.tf_eflags &= (~FL_IOPL_MASK | FL_IOPL_0); // 设置 IO 优先级
     return 0;
-	// panic("sys_env_set_trapframe not implemented");
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
