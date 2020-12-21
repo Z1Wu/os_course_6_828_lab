@@ -302,6 +302,26 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	uint32_t addr, pn;
+	int ret;
+	for (addr = 0; addr < USTACKTOP; addr += PGSIZE) {
+		pn = PGNUM(addr);
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[pn] & PTE_P) && (uvpt[pn] & PTE_U)) { // 对于所有父进程的页表项
+			void* v_addr = (void *) addr;
+			// cprintf("pte %08x \n", addr);
+			if (uvpt[pn] & PTE_SHARE) { // if shared
+				ret = sys_page_map(0, v_addr, 0, v_addr, (uvpt[pn] & PTE_SYSCALL) | PTE_SHARE);
+				if (ret < 0) {
+					panic("error occur when set current shared pte %d", ret);
+				}
+				ret = sys_page_map(0, v_addr, child, v_addr, (uvpt[pn] & PTE_SYSCALL) | PTE_SHARE);
+				if (ret < 0) {
+					panic("error occur when set target shared pte erro code %d", ret);
+				}
+			}
+		}
+	}
+		
 	return 0;
 }
 

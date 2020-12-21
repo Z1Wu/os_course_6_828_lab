@@ -377,8 +377,8 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
         return -E_IPC_NOT_RECV;
     }
 
-    dst_e->env_ipc_recving = false;
-    dst_e->env_ipc_value = value;
+    dst_e->env_ipc_recving = false; // block further sending
+    dst_e->env_ipc_value = value; // 
     dst_e->env_status = ENV_RUNNABLE;
     dst_e->env_ipc_perm = 0;
     dst_e->env_ipc_from = curenv->env_id;

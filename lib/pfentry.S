@@ -50,7 +50,7 @@ _pgfault_upcall:
 	//   into a register, and all registers must have their trap-time
 	//   values after the return.
 	//   We can't call 'ret' from the exception stack either, since if we
-	//   did, %esp would have the wrong value.
+	//   did, %esp would have 	the wrong value.
 	//   So instead, we push the trap-time %eip onto the *trap-time* stack!
 	//   Below we'll switch to that stack and call 'ret', which will
 	//   restore %eip to its pre-fault value.

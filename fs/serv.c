@@ -69,11 +69,13 @@ openfile_alloc(struct OpenFile **o)
 	// Find an available open-file table entry
 	for (i = 0; i < MAXOPEN; i++) {
 		switch (pageref(opentab[i].o_fd)) {
-		case 0:
+		case 0: // 如果该 fd 还没有分配内存，首次使用
 			if ((r = sys_page_alloc(0, opentab[i].o_fd, PTE_P|PTE_U|PTE_W)) < 0)
 				return r;
 			/* fall through */
-		case 1:
+		case 1: 
+			// 代表这个 fd 之前被使用过，但是使用这个 fd 的用户进程已经退出，现在这个 fd 可以被循环利用，1 代表的是 fs server进程持有
+			// 如果还有别的进程在使用的话,也就是 ppref == 2 代表应该换个别的 open_file 
 			opentab[i].o_fileid += MAXOPEN;
 			*o = &opentab[i];
 			memset(opentab[i].o_fd, 0, PGSIZE);
@@ -160,7 +162,7 @@ try_open:
 	// Save the file pointer
 	o->o_file = f;
 
-	// Fill out the Fd structure
+	// Fill out the Fd structure，这个结构会返回给文件 
 	o->o_fd->fd_file.id = o->o_fileid;
 	o->o_fd->fd_omode = req->req_omode & O_ACCMODE;
 	o->o_fd->fd_dev_id = devfile.dev_id;

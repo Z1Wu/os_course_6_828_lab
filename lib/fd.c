@@ -19,6 +19,11 @@
 // --------------------------------------------------------------
 // File descriptor manipulators
 // --------------------------------------------------------------
+bool is_in_fd_region(void* addr) { 
+	uint32_t addr_u = (uint32_t)addr;
+	return addr_u >= FDTABLE && addr_u <= (FILEDATA +  MAXFD * PGSIZE);
+}
+
 
 int
 fd2num(struct Fd *fd)
@@ -48,7 +53,7 @@ fd2data(struct Fd *fd)
 //	-E_MAX_FD: no more file descriptors
 // On error, *fd_store is set to 0.
 int
-fd_alloc(struct Fd **fd_store)
+fd_alloc(struct Fd **fd_store) // 这个函数不分配内存给 fd
 {
 	int i;
 	struct Fd *fd;

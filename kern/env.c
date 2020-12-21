@@ -100,6 +100,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 	// must be either the current environment
 	// or an immediate child of the current environment.
 	if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
+		// cprintf("check ")
 		*env_store = 0;
 		return -E_BAD_ENV;
 	}
@@ -140,7 +141,7 @@ env_init_percpu(void)
 	lgdt(&gdt_pd);
 	// The kernel never uses GS or FS, so we leave those set to
 	// the user data segment.
-	asm volatile("movw %%ax,%%gs" : : "a" (GD_UD|3));
+	asm volatile("movw %%ax,%%gs" : : "a" (GD_UD|3)); // 为什么这里要 "|3"
 	asm volatile("movw %%ax,%%fs" : : "a" (GD_UD|3));
 	// The kernel does use ES, DS, and SS.  We'll change between
 	// the kernel and user data segments as needed.

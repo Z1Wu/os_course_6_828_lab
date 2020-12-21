@@ -272,6 +272,15 @@ trap_dispatch(struct Trapframe *tf)
 
 	// Handle keyboard and serial interrupts.
 	// LAB 5: Your code here.
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
+		serial_intr();
+		return;
+	}
+
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
+		kbd_intr();
+		return;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -405,7 +414,7 @@ page_fault_handler(struct Trapframe *tf)
         // page fault may occur during handler
         if (UXSTACKTOP-PGSIZE<=tf->tf_esp && tf->tf_esp<=UXSTACKTOP-1) // 判断这个 page fault 是在哪里发生的,
             // 如果是在处理 user-env 的pagefault 是发生新的 page fault 
-            // 在原来的 user-exception stack 的基础上在压入新的 task frame
+            // 在原来的 user-exception stack 的基础上在压入新的 stack frame
             // push 一次是 4 bytes
             // TODO: 这里多压入的一个 word 的作用，因为后续的进入
 			utf_addr = tf->tf_esp - sizeof(struct UTrapframe) - 4;

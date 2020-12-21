@@ -7,6 +7,13 @@
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW		0x800
 
+// #define MAXFD		32
+// // Bottom of file descriptor area
+// #define FDTABLE		0xD0000000
+// // Bottom of file data area.  We reserve one data page for each FD,
+// // which devices can use if they choose.
+// #define FILEDATA	(FDTABLE + MAXFD*PGSIZE)
+
 //
 // Custom page fault handler - if faulting page is copy-on-write,
 // map in our own private writable copy.
@@ -65,6 +72,7 @@ pgfault(struct UTrapframe *utf)
 	return;
 }
 
+
 //
 // Map our virtual page pn (address pn*PGSIZE) into the target envid
 // at the same virtual address.  If the page is writable or copy-on-write,
@@ -97,8 +105,16 @@ duppage(envid_t envid, unsigned pn)
 
 	// LAB 4: Your code here.
 	void *addr = (void*) (pn*PGSIZE);
-    // cprintf("")
-	if ((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)) {
+	if ((uvpt[pn] & PTE_SHARE)) { // 在 shared 区域
+		cprintf("fork share addr %8x \n", addr);
+		if (sys_page_map(0, addr, 0, addr, (uvpt[pn] & PTE_SYSCALL) | PTE_SHARE) < 0) {
+			panic("error occur when set current shared pte");
+		}
+		if (sys_page_map(0, addr, envid, addr, (uvpt[pn] & PTE_SYSCALL) | PTE_SHARE) < 0) {
+			panic("error occur when set target shared pte");
+		}
+	} else if ((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)) { 
+		// 如果当前的 env addr 对应的 pte 是可写/ cow 的，需要修改 map 。
 		if (sys_page_map(0, addr, envid, addr, PTE_COW|PTE_U|PTE_P) < 0)
 			panic("2");
 		if (sys_page_map(0, addr, 0, addr, PTE_COW|PTE_U|PTE_P) < 0)
@@ -211,7 +227,7 @@ fork(void)
 			&& (uvpt[PGNUM(addr)] & PTE_U)) { // 需要执行子进程到父进程的内存映射的页
 			duppage(envid, PGNUM(addr));
 		}
-    // 子进程的 excepetion stack 和父进程的共同使用
+    // 父进程为子进程分配一个新的页用于 exception stack
 	if (sys_page_alloc(envid, (void *)(UXSTACKTOP-PGSIZE), PTE_U|PTE_W|PTE_P) < 0) 
 		panic("1");
 

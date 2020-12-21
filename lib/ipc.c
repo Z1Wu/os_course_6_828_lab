@@ -25,11 +25,12 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	// LAB 4: Your code here.
     int r;
     if(pg == NULL) {
+        // 传输一个 非法 的地址代表不接受 mapping page 
         r = sys_ipc_recv((void *)(UTOP + 1));
     } else {
         r = sys_ipc_recv(pg);
     }
-    if(r != 0) {
+    if(r != 0) { // error occur
         if (from_env_store) *from_env_store = 0;
         if (perm_store) *perm_store = 0;
         return r;

@@ -24,8 +24,8 @@ fsipc(unsigned type, void *dstva)
 	if (debug)
 		cprintf("[%08x] fsipc %d %08x\n", thisenv->env_id, type, *(uint32_t *)&fsipcbuf);
 
-	ipc_send(fsenv, type, &fsipcbuf, PTE_P | PTE_W | PTE_U);
-	return ipc_recv(NULL, dstva, NULL);
+	ipc_send(fsenv, type, &fsipcbuf, PTE_P | PTE_W | PTE_U); // type 用于表示类型，fsipcbuf 用于传递 request 结构
+	return ipc_recv(NULL, dstva, NULL); // dstva 用于接收文件系统的返回
 }
 
 static int devfile_flush(struct Fd *fd);
