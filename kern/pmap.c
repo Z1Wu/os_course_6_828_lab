@@ -161,7 +161,7 @@ mem_init(void)
 	// LAB 3: Your code here.
     int envs_size = NENV * sizeof(struct Env);
     envs = (struct Env*) boot_alloc(envs_size);
-    memset(pages, 0, envs_size);;
+    memset(envs, 0, envs_size);
 
 
 	//////////////////////////////////////////////////////////////////////
