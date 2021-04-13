@@ -106,13 +106,15 @@ mp_main(void)
 	lapic_init();
 	env_init_percpu();
 	trap_init_percpu();
-	xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up
+	xchg(&thiscpu->cpu_status, CPU_STARTED); 
+	// tell boot_aps() we're up
 	// Now that we have finished some basic setup, call sched_yield()
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
 	//
 	// Your code here:
-    lock_kernel(); // 在进入 schduler 之前需要加锁
+	// 
+    lock_kernel(); 
     sched_yield(); // 这里会释放前面拿到的锁
 
 	// // Remove this after you finish Exercise 6

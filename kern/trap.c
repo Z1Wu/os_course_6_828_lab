@@ -400,14 +400,16 @@ page_fault_handler(struct Trapframe *tf)
         struct UTrapframe* utf;
         uintptr_t utf_addr; // esp of user fault stack
         // page fault may occur during handler
-        if (UXSTACKTOP-PGSIZE<=tf->tf_esp && tf->tf_esp<=UXSTACKTOP-1) // 判断这个 page fault 是在哪里发生的,
-            // 如果是在处理 user-env 的pagefault 是发生新的 page fault 
+        if (UXSTACKTOP-PGSIZE<=tf->tf_esp && tf->tf_esp<=UXSTACKTOP-1){ // 判断这个 page fault 是在哪里发生的
+			// 如果是在处理 user-env 的pagefault 是发生新的 page fault 
             // 在原来的 user-exception stack 的基础上在压入新的 task frame
             // push 一次是 4 bytes
-            // TODO: 这里多压入的一个 word 的作用，因为后续的进入
 			utf_addr = tf->tf_esp - sizeof(struct UTrapframe) - 4;
-		else 
+		} 
+		else {
 			utf_addr = UXSTACKTOP - sizeof(struct UTrapframe);
+		}
+			
         // check whether the exception stack is allocated
 		user_mem_assert(curenv, (void*)utf_addr, 1, PTE_W);//1 is enough
 

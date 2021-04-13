@@ -15,7 +15,10 @@ forkchild(const char *cur, char branch)
 		return;
 
 	snprintf(nxt, DEPTH+1, "%s%c", cur, branch);
-	if (fork() == 0) {
+	int ret = fork();
+	// cprintf("[[%08x]]: %08x \n", thisenv->env_id, ret);
+	if (ret == 0) {
+		cprintf("%d", ret);
 		forktree(nxt);
 		exit();
 	}

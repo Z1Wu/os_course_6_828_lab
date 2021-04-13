@@ -280,7 +280,14 @@ mem_init_mp(void)
     // percpu_kstacks
     // NCPU
     for(int i = 0; i < NCPU; i ++) { //  KSTACKTOP already mapped to bootstack, and bootstack don't have KSTKGAP 
-        boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE - i  * (KSTKSIZE + KSTKGAP), KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
+        boot_map_region(
+			kern_pgdir, 
+			KSTACKTOP - KSTKSIZE - i  * (KSTKSIZE + KSTKGAP), 
+			KSTKSIZE, 
+			// percpu_kstacks defined as a global varible in mpconfig.c, it will reside in data segment of kernel object 
+			PADDR(percpu_kstacks[i]), 
+			PTE_W
+		);
     }
 }
 
