@@ -32,11 +32,11 @@ struct FdSock {
 };
 
 struct Fd {
-	int fd_dev_id;
+	int fd_dev_id; // 这个 Fd 对应的设备
 	off_t fd_offset;
 	int fd_omode;
 	union {
-		// File server files
+		// File server files, 对应 fs server env 维护的 open file 列表
 		struct FdFile fd_file;
 		// Network sockets
 		struct FdSock fd_sock;

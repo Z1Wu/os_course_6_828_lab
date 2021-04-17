@@ -48,10 +48,25 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
+    void* rounded_addr = ROUNDDOWN(addr, PGSIZE);
+    
+    // cprintf("handle page fault at %x\n", addr);
+    r = sys_page_alloc(0, rounded_addr,  PTE_W|PTE_U|PTE_P);
+    if (r < 0) {
+        panic("error when alloc page %d\n", r);
+    }
+    // read a block
+    // sec_p_blk = BLKSECTS
+    r = ide_read(BLKSECTS * blockno, rounded_addr, BLKSECTS);
+    if( r < 0 ) {
+        panic("ide_read: %e", r);
+    }
+
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
-	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
+    // 这里的 addr 应该采用 page align
+	if ((r = sys_page_map(0, rounded_addr, 0, rounded_addr, uvpt[PGNUM(rounded_addr)] & PTE_SYSCALL)) < 0)
 		panic("in bc_pgfault, sys_page_map: %e", r);
 
 	// Check that the block we read was allocated. (exercise for
@@ -59,6 +74,8 @@ bc_pgfault(struct UTrapframe *utf)
 	// in?)
 	if (bitmap && block_is_free(blockno))
 		panic("reading free block %08x\n", blockno);
+    
+    // cprintf("handle page fault done \n");
 }
 
 // Flush the contents of the block containing VA out to disk if
@@ -71,13 +88,25 @@ bc_pgfault(struct UTrapframe *utf)
 void
 flush_block(void *addr)
 {
+    int r;
 	uint32_t blockno = ((uint32_t)addr - DISKMAP) / BLKSIZE;
 
 	if (addr < (void*)DISKMAP || addr >= (void*)(DISKMAP + DISKSIZE))
 		panic("flush_block of bad va %08x", addr);
+    
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+    // check whether the dirty bit is set
+    if(va_is_mapped(addr) && va_is_dirty(addr)) {
+        void* r_addr = (void *)ROUNDDOWN(addr, PGSIZE);
+        // cprintf("write %d, %x into disk \n", blockno, addr);
+        r = ide_write(blockno * BLKSECTS, r_addr, BLKSECTS);
+        // clear dirty bit
+        if ((r = sys_page_map(0, r_addr, 0, r_addr, uvpt[PGNUM(r_addr)] & PTE_SYSCALL)) < 0) { 
+            panic("in bc_pgfault, sys_page_map: %e", r);
+        }
+    }
+    // do nothing if the addr have not mapped yet or not been dirty
 }
 
 // Test that the block cache works, by smashing the superblock and
@@ -146,6 +175,7 @@ bc_init(void)
 	check_bc();
 
 	// cache the super block by reading it once
+    cprintf("addr of super block %x \n", diskaddr(1));
 	memmove(&super, diskaddr(1), sizeof super);
 }
 

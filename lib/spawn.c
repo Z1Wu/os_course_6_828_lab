@@ -104,7 +104,7 @@ spawn(const char *prog, const char **argv)
 	child = r;
 
 	// Set up trap frame, including initial stack.
-	child_tf = envs[ENVX(child)].env_tf;
+	child_tf = envs[ENVX(child)].env_tf; // 这里是一个复制操作，用户进程没有权限直接修改 envs中的 的内容
 	child_tf.tf_eip = elf->e_entry;
 
 	if ((r = init_stack(child, argv, &child_tf.tf_esp)) < 0)
@@ -234,7 +234,7 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp)
 	//	* Set *init_esp to the initial stack pointer for the child,
 	//	  (Again, use an address valid in the child's environment.)
 	for (i = 0; i < argc; i++) {
-		argv_store[i] = UTEMP2USTACK(string_store);
+		argv_store[i] = UTEMP2USTACK(string_store); // argv[i] 指向的是之后的重新映射的地址
 		strcpy(string_store, argv[i]);
 		string_store += strlen(argv[i]) + 1;
 	}
@@ -244,7 +244,7 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp)
 	argv_store[-1] = UTEMP2USTACK(argv_store);
 	argv_store[-2] = argc;
 
-	*init_esp = UTEMP2USTACK(&argv_store[-2]);
+	*init_esp = UTEMP2USTACK(&argv_store[-2]); // esp 的指向
 
 	// After completing the stack, map it into the child's address space
 	// and unmap it from ours!
@@ -302,6 +302,26 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	uint32_t addr, pn;
+	int ret;
+	for (addr = 0; addr < USTACKTOP; addr += PGSIZE) {
+		pn = PGNUM(addr);
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[pn] & PTE_P) && (uvpt[pn] & PTE_U)) { // 对于所有父进程的页表项
+			void* v_addr = (void *) addr;
+			// cprintf("pte %08x \n", addr);
+			if (uvpt[pn] & PTE_SHARE) { // if shared
+				ret = sys_page_map(0, v_addr, 0, v_addr, (uvpt[pn] & PTE_SYSCALL) | PTE_SHARE);
+				if (ret < 0) {
+					panic("error occur when set current shared pte %d", ret);
+				}
+				ret = sys_page_map(0, v_addr, child, v_addr, (uvpt[pn] & PTE_SYSCALL) | PTE_SHARE);
+				if (ret < 0) {
+					panic("error occur when set target shared pte erro code %d", ret);
+				}
+			}
+		}
+	}
+		
 	return 0;
 }
 

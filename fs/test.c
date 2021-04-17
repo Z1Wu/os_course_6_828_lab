@@ -32,7 +32,7 @@ fs_test(void)
 	else if (r == 0)
 		panic("file_open /not-found succeeded!");
 	if ((r = file_open("/newmotd", &f)) < 0)
-		panic("file_open /newmotd: %e", r);
+		panic("file_open /newmotd: %d, %e", r, r);
 	cprintf("file_open is good\n");
 
 	if ((r = file_get_block(f, 0, &blk)) < 0)

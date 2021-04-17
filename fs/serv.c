@@ -68,12 +68,14 @@ openfile_alloc(struct OpenFile **o)
 
 	// Find an available open-file table entry
 	for (i = 0; i < MAXOPEN; i++) {
-		switch (pageref(opentab[i].o_fd)) {
-		case 0:
+		switch (pageref(opentab[i].o_fd)) { // 用户空间也是能够得到每个物理页面的使用情况
+		case 0: // 如果该 fd 还没有分配内存，首次使用
 			if ((r = sys_page_alloc(0, opentab[i].o_fd, PTE_P|PTE_U|PTE_W)) < 0)
 				return r;
 			/* fall through */
-		case 1:
+		case 1: 
+			// 代表这个 fd 之前被使用过，但是使用这个 fd 的用户进程已经退出，现在这个 fd 可以被循环利用，1 代表的是 fs server进程持有
+			// 如果还有别的进程在使用的话,也就是 ppref == 2 代表应该换个别的 open_file 
 			opentab[i].o_fileid += MAXOPEN;
 			*o = &opentab[i];
 			memset(opentab[i].o_fd, 0, PGSIZE);
@@ -91,7 +93,8 @@ openfile_lookup(envid_t envid, uint32_t fileid, struct OpenFile **po)
 
 	o = &opentab[fileid % MAXOPEN];
 	if (pageref(o->o_fd) <= 1 || o->o_fileid != fileid)
-		return -E_INVAL;
+		// 如果用户进程 unmap fd 对应的的页
+        return -E_INVAL;
 	*po = o;
 	return 0;
 }
@@ -160,6 +163,7 @@ try_open:
 	o->o_file = f;
 
 	// Fill out the Fd structure
+	// FD 文件会通过 page map 的方式返回给文件
 	o->o_fd->fd_file.id = o->o_fileid;
 	o->o_fd->fd_omode = req->req_omode & O_ACCMODE;
 	o->o_fd->fd_dev_id = devfile.dev_id;
@@ -214,7 +218,23 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+    int r;
+    uint32_t n_read = req->req_n;
+	struct OpenFile *o;
+
+    r = openfile_lookup(envid, req->req_fileid, &o);
+    if (r < 0) {
+		return r;
+    }
+
+    r = file_read(o->o_file, ret->ret_buf, n_read, o->o_fd->fd_offset);
+    if (r < 0) {
+        cprintf("error occur when file read %d\n", r);
+        return r;
+    }
+    // if success, update fd offset
+    o->o_fd->fd_offset += r;
+    return r;
 }
 
 
@@ -228,8 +248,22 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	if (debug)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
+    int r;
+    uint32_t n_read = req->req_n;
+	struct OpenFile *o;
+    r = openfile_lookup(envid, req->req_fileid, &o);
+    if (r < 0) {
+		return r;
+    }
+    r = file_write(o->o_file, req->req_buf, req->req_n, o->o_fd->fd_offset);
+    if (r < 0) {
+        cprintf("error occur when file read %d\n", r);
+        return r;
+    }
+    o->o_fd->fd_offset += r;
+    return r;
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	// panic("serve_write not implemented");
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
@@ -300,7 +334,7 @@ serve(void)
 
 	while (1) {
 		perm = 0;
-		req = ipc_recv((int32_t *) &whom, fsreq, &perm);
+		req = ipc_recv((int32_t *) &whom, fsreq, &perm); // req 是通过 ipc_send(val) 传递过来的
 		if (debug)
 			cprintf("fs req %d from %08x [page %08x: %s]\n",
 				req, whom, uvpt[PGNUM(fsreq)], fsreq);
@@ -321,7 +355,7 @@ serve(void)
 			cprintf("Invalid request code %d from %08x\n", req, whom);
 			r = -E_INVAL;
 		}
-		ipc_send(whom, r, pg, perm);
+		ipc_send(whom, r, pg, perm); // send page 只是用来返回 fd
 		sys_page_unmap(0, fsreq);
 	}
 }
@@ -336,9 +370,13 @@ umain(int argc, char **argv)
 	// Check that we are able to do I/O
 	outw(0x8A00, 0x8A00);
 	cprintf("FS can do I/O\n");
-
+    cprintf("do serve init \n");
 	serve_init();
+    cprintf("do fs init \n");
 	fs_init();
+    cprintf("do fs test \n");
+        fs_test();
+    cprintf("serve \n");
 	serve();
 }
 

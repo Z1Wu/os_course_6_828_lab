@@ -51,6 +51,7 @@ i386_init(void)
 	// Your code here:
 
 	// Starting non-boot CPUs
+    lock_kernel();
 	boot_aps();
 
 	// Start fs.
@@ -85,13 +86,13 @@ void *mpentry_kstack;
 static void
 boot_aps(void)
 {
-	extern unsigned char mpentry_start[], mpentry_end[];
+	extern unsigned char mpentry_start[], mpentry_end[]; // this two symbols defined in mpentry.S
 	void *code;
 	struct CpuInfo *c;
 
 	// Write entry code to unused memory at MPENTRY_PADDR
 	code = KADDR(MPENTRY_PADDR);
-	memmove(code, mpentry_start, mpentry_end - mpentry_start);
+	memmove(code, mpentry_start, mpentry_end - mpentry_start); // move code to 
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
@@ -120,15 +121,16 @@ mp_main(void)
 	env_init_percpu();
 	trap_init_percpu();
 	xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up
-
 	// Now that we have finished some basic setup, call sched_yield()
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
 	//
 	// Your code here:
+    lock_kernel(); // 在进入 schduler 之前需要加锁
+    sched_yield(); // 这里会释放前面拿到的锁
 
-	// Remove this after you finish Exercise 6
-	for (;;);
+	// // Remove this after you finish Exercise 6
+	// for (;;);
 }
 
 /*

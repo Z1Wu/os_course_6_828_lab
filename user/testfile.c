@@ -32,12 +32,15 @@ umain(int argc, char **argv)
 		panic("serve_open /not-found: %e", r);
 	else if (r >= 0)
 		panic("serve_open /not-found succeeded!");
+    cprintf("pgref of page: %d\n",pageref(FVA));
+
 
 	if ((r = xopen("/newmotd", O_RDONLY)) < 0)
 		panic("serve_open /newmotd: %e", r);
 	if (FVA->fd_dev_id != 'f' || FVA->fd_offset != 0 || FVA->fd_omode != O_RDONLY)
 		panic("serve_open did not fill struct Fd correctly\n");
 	cprintf("serve_open is good\n");
+    cprintf("pgref of page: %d\n",pageref(FVA));
 
 	if ((r = devfile.dev_stat(FVA, &st)) < 0)
 		panic("file_stat: %e", r);
@@ -55,6 +58,7 @@ umain(int argc, char **argv)
 	if ((r = devfile.dev_close(FVA)) < 0)
 		panic("file_close: %e", r);
 	cprintf("file_close is good\n");
+    cprintf("pgref of page: %d\n",pageref(FVA));
 
 	// We're about to unmap the FD, but still need a way to get
 	// the stale filenum to serve_read, so we make a local copy.
@@ -64,7 +68,7 @@ umain(int argc, char **argv)
 	sys_page_unmap(0, FVA);
 
 	if ((r = devfile.dev_read(&fdcopy, buf, sizeof buf)) != -E_INVAL)
-		panic("serve_read does not handle stale fileids correctly: %e", r);
+		panic("serve_read does not handle stale fileids correctly: %d, %e", r, r);
 	cprintf("stale fileid is good\n");
 
 	// Try writing

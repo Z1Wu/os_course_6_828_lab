@@ -32,7 +32,7 @@ duppage(envid_t dstenv, void *addr)
 		panic("sys_page_alloc: %e", r);
 	if ((r = sys_page_map(dstenv, addr, 0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_map: %e", r);
-	memmove(UTEMP, addr, PGSIZE);
+	memmove(UTEMP, addr, PGSIZE); // 把父进程 addr 处的内容复制到子进程的 addr 处
 	if ((r = sys_page_unmap(0, UTEMP)) < 0)
 		panic("sys_page_unmap: %e", r);
 }

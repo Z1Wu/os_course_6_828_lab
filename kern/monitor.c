@@ -11,6 +11,7 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 #include <kern/trap.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -25,6 +26,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+    { "show_mappings", "Show memory mapping", mon_mem_mappings},
+    { "backtrace", "Show backtrace stack", mon_backtrace}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -59,10 +62,75 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+    // uint32_t* ebp = (uint32_t*) read_ebp();
+	// cprintf("Stack backtrace:\n");
+	// while (ebp) {
+	// 	cprintf("ebp %x  eip %x  args", ebp, ebp[1]);
+	// 	int i;
+	// 	for (i = 2; i <= 6; ++i)
+	// 		cprintf(" %08.x", ebp[i]);
+	// 	cprintf("\n");
+	// 	ebp = (uint32_t*) *ebp;
+	// }
+    uint32_t* ebp = (uint32_t*) read_ebp();
+	cprintf("Stack backtrace:\n");
+	while (ebp) {
+		uint32_t eip = ebp[1];
+		cprintf("ebp %x  eip %x  args", ebp, eip);
+		int i;
+		for (i = 2; i <= 6; ++i)
+			cprintf(" %08.x", ebp[i]);
+		cprintf("\n");
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip, &info);
+		cprintf("\t%s:%d: %.*s+%d\n", 
+			info.eip_file, info.eip_line,
+			info.eip_fn_namelen, info.eip_fn_name,
+			eip-info.eip_fn_addr);
+//         kern/monitor.c:143: monitor+106
+		ebp = (uint32_t*) *ebp;
+    }
 	return 0;
 }
 
+/**
+ * hex to int
+**/
+uint32_t xtoi(char* buf) {
+	uint32_t res = 0;
+	buf += 2; //0x...
+	while (*buf) { 
+		if (*buf >= 'a') *buf = *buf-'a'+'0'+10;//aha
+		res = res*16 + *buf - '0';
+		++buf;
+	}
+	return res;
+}
 
+void pprint(pte_t *pte) {
+	cprintf("PTE_P: %x, PTE_W: %x, PTE_U: %x\n", 
+		*pte&PTE_P, *pte&PTE_W, *pte&PTE_U);
+}
+
+int
+mon_mem_mappings(int argc, char **argv, struct Trapframe *tf)
+{
+    if (argc == 1) {
+        cprintf("Usage: showmappings 0xbegin_addr 0xend_addr\n");
+        return 0;
+    }
+	uint32_t begin = xtoi(argv[1]), end = xtoi(argv[2]);
+	cprintf("begin: %x, end: %x\n", begin, end);
+	for (; begin <= end; begin += PGSIZE) {
+		pte_t *pte = pgdir_walk(kern_pgdir, (void *) begin, 1);	//create
+		if (!pte) panic("boot_map_region panic, out of memory");
+		if (*pte & PTE_P) {
+			cprintf("page %x with ", begin);
+			pprint(pte);
+		} else cprintf("page not exist: %x\n", begin);
+	}
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 
@@ -111,13 +179,19 @@ runcmd(char *buf, struct Trapframe *tf)
 void
 monitor(struct Trapframe *tf)
 {
-	char *buf;
+    char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
-	cprintf("Type 'help' for a list of commands.\n");
+    cprintf("Welcome to the JOS kernel monitor!\n");
+    cprintf("Type 'help' for a list of commands.\n");
 
-	if (tf != NULL)
-		print_trapframe(tf);
+    if (tf != NULL)
+        print_trapframe(tf);
+        
+    // int x = 1, y = 3, z = 4;
+    // cprintf("x %d, y %x, z %d\n", x, y, z);
+
+    // unsigned int i = 0x00646c72;
+    // cprintf("H%x Wo%s", 57616, &i);
 
 	while (1) {
 		buf = readline("K> ");
