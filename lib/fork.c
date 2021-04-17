@@ -87,22 +87,6 @@ pgfault(struct UTrapframe *utf)
 static int
 duppage(envid_t envid, unsigned pn)
 {
-    // int r;
-    // uintptr_t addr = pn * PGSIZE;
-    // thisenv->env_pgdir
-    // envid_t cur_eid = sys_getenvid();
-    // if( uvpt[pn] & PTE_W || uvpt[pn] & PTE_COW ) { // if that page is copy-on-write or write
-    //     // 让子进程的内存空间映射到父进程对应的页中
-    //     r = sys_page_map(cur_eid, (void*)addr, envid, (void*)addr, PTE_COW | PTE_U | PTE_P);
-    //     if( r < 0) panic("error c2d");
-    //     // 修改父进程的内存空间
-    //     r = sys_page_map(cur_eid, (void*)addr, cur_eid, (void*)addr, PTE_COW | PTE_U | PTE_P);
-    //     if( r < 0) panic("error d2d");
-    // } else { // 只读的页
-    //     r = sys_page_map(cur_eid, (void*)addr, envid, (void*)addr, PTE_U | PTE_P);
-    //     if( r < 0) panic("error d2d_r");
-    // }
-
 	// LAB 4: Your code here.
 	void *addr = (void*) (pn*PGSIZE);
 	if ((uvpt[pn] & PTE_SHARE)) { // 在 shared 区域

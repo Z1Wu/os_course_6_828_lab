@@ -68,7 +68,7 @@ openfile_alloc(struct OpenFile **o)
 
 	// Find an available open-file table entry
 	for (i = 0; i < MAXOPEN; i++) {
-		switch (pageref(opentab[i].o_fd)) {
+		switch (pageref(opentab[i].o_fd)) { // 用户空间也是能够得到每个物理页面的使用情况
 		case 0: // 如果该 fd 还没有分配内存，首次使用
 			if ((r = sys_page_alloc(0, opentab[i].o_fd, PTE_P|PTE_U|PTE_W)) < 0)
 				return r;
@@ -162,7 +162,8 @@ try_open:
 	// Save the file pointer
 	o->o_file = f;
 
-	// Fill out the Fd structure，这个结构会返回给文件 
+	// Fill out the Fd structure
+	// FD 文件会通过 page map 的方式返回给文件
 	o->o_fd->fd_file.id = o->o_fileid;
 	o->o_fd->fd_omode = req->req_omode & O_ACCMODE;
 	o->o_fd->fd_dev_id = devfile.dev_id;
@@ -333,7 +334,7 @@ serve(void)
 
 	while (1) {
 		perm = 0;
-		req = ipc_recv((int32_t *) &whom, fsreq, &perm);
+		req = ipc_recv((int32_t *) &whom, fsreq, &perm); // req 是通过 ipc_send(val) 传递过来的
 		if (debug)
 			cprintf("fs req %d from %08x [page %08x: %s]\n",
 				req, whom, uvpt[PGNUM(fsreq)], fsreq);
@@ -354,7 +355,7 @@ serve(void)
 			cprintf("Invalid request code %d from %08x\n", req, whom);
 			r = -E_INVAL;
 		}
-		ipc_send(whom, r, pg, perm);
+		ipc_send(whom, r, pg, perm); // send page 只是用来返回 fd
 		sys_page_unmap(0, fsreq);
 	}
 }

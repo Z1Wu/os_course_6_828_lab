@@ -69,7 +69,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
         }
         // 到这里说明目前对应的进程没有期望接收信息
         cprintf("target %d don't expect receive massage give up cpu\n", to_env);
-        sys_yield(); // TODO: 为什么需要放弃 CPU，同时这个 send 为什么要放在一个 loop 里面?
+        sys_yield(); 
     }
 	panic("ipc_send not implemented");
 }

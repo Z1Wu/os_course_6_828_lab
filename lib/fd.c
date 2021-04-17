@@ -5,7 +5,7 @@
 // Maximum number of file descriptors a program may hold open concurrently
 #define MAXFD		32
 // Bottom of file descriptor area
-#define FDTABLE		0xD0000000
+#define FDTABLE		0xD0000000 // below UTOP
 // Bottom of file data area.  We reserve one data page for each FD,
 // which devices can use if they choose.
 #define FILEDATA	(FDTABLE + MAXFD*PGSIZE)
@@ -53,7 +53,10 @@ fd2data(struct Fd *fd)
 //	-E_MAX_FD: no more file descriptors
 // On error, *fd_store is set to 0.
 int
-fd_alloc(struct Fd **fd_store) // 这个函数不分配内存给 fd
+fd_alloc(struct Fd **fd_store) 
+// fd_alloc 实际上不分配内存给 FD
+// 只是返回一个当前可以接受 page_map 的 fd 的位置
+// 真正的 fd 的内存分配是通过 file system server 来实现的
 {
 	int i;
 	struct Fd *fd;
@@ -229,7 +232,7 @@ readn(int fdnum, void *buf, size_t n)
 {
 	int m, tot;
 
-	for (tot = 0; tot < n; tot += m) {
+	for (tot = 0; tot < n; tot += m) { // fd read 每次读取的数据长度有限制，不一定能够满足 n
 		m = read(fdnum, (char*)buf + tot, n - tot);
 		if (m < 0)
 			return m;
