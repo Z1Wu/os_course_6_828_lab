@@ -45,6 +45,7 @@ i386_init(void)
 
 	// Lab 6 hardware initialization functions
 	time_init();
+	// cprintf("current time %u \n", time_msec());
 	pci_init();
 
 	// Acquire the big kernel lock before waking up APs
