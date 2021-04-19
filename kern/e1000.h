@@ -2,28 +2,65 @@
 #define JOS_KERN_E1000_H
 #include "pci.h"
 #include "e1000_hw.h"
+#include "inc/string.h"
 
-#define TX_DESCRIPTOR_QUEUE_SIZE 48
+#define TX_DESCRIPTOR_QUEUE_SIZE 16
 #define TX_BUF_SIZE 1518
 
 int e1000_attachfn (struct pci_func *pcif);
+int send_one_packet(void* packet, uint32_t size);
 
+// struct tx_desc
+// {
+// 	// uint64_t addr;
+//     struct addr {
+//         uint32_t low;
+//         uint32_t high;
+//     } addr;
+// 	uint32_t length: 16;
+// 	uint32_t cso:8;
+	
+//     struct cmd {
+//         uint32_t eop : 1;
+//         uint32_t ifcs : 1;
+//         uint32_t ic : 1;
+//         uint32_t rs : 1;
+//         uint32_t other : 4;
+//     } cmd;
+//     struct status {
+//         uint32_t dd : 1;
+//         uint32_t ec : 1;
+//         uint32_t lc : 1;
+//         uint32_t rsv : 1;
+//     } status;
+// 	uint32_t css : 8;
+// 	uint32_t special:16;
+// };
 
 struct tx_desc
 {
-	uint64_t addr;
-	uint16_t length;
-	uint8_t cso;
-	
-    uint8_t cmd;
-    struct status {
-        uint8_t dd : 1;
-        uint8_t ec : 1;
-        uint8_t lc : 1;
-        uint8_t rsv : 1;
-    } status;
-	uint8_t css;
-	uint16_t special;
+	// uint64_t addr;
+    uint32_t addr_low : 32;
+    uint32_t addr_high : 32;
+	uint32_t length: 16;
+	uint32_t cso:8;
+    // CMD
+    uint32_t eop : 1;
+    uint32_t ifcs : 1;
+    uint32_t ic : 1;
+    uint32_t rs : 1;
+    uint32_t other : 4;
+    // STA
+    uint32_t dd : 1;
+    uint32_t ec : 1;
+    uint32_t lc : 1;
+    uint32_t rsv : 1;
+    // RSV
+    uint32_t rsv1 : 4;
+    // CSS
+	uint32_t css : 8;
+    // SPECIAL
+	uint32_t special:16;
 };
 
 struct e1000_tdba

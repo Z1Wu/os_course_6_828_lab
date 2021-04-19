@@ -12,6 +12,8 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
+
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -443,6 +445,14 @@ sys_time_msec(void)
 	// panic("sys_time_msec not implemented");
 }
 
+static int
+sys_try_send_packet(void* packet, uint32_t size)
+{
+	// LAB 6: Your code here.
+    user_mem_assert(curenv, (void*)packet, size, PTE_U | PTE_P);
+    return send_one_packet(packet, size);
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -486,6 +496,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return sys_env_set_trapframe(a1, (struct Trapframe*)a2);
         case SYS_time_msec:
             return sys_time_msec();
+        case SYS_send_packet:
+            return sys_try_send_packet((char *)a1, (uint32_t)a2);
         default:
             return -E_INVAL;
 	}
