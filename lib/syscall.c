@@ -129,3 +129,8 @@ sys_try_send_packet(void* packet, uint32_t size)
 	return (unsigned int) syscall(SYS_send_packet, 0, (uint32_t)packet, size, 0, 0, 0);
 }
 
+unsigned int
+sys_try_recv_packet(void* packet, uint32_t size)
+{
+	return (unsigned int) syscall(SYS_recv_packet, 0, (uint32_t)packet, size, 0, 0, 0);
+}

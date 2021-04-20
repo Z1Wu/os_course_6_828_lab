@@ -59,7 +59,7 @@ pgfault(struct UTrapframe *utf)
 
 	if (!((err & FEC_WR) && (uvpd[PDX(addr)] & PTE_P) && 
 			(uvpt[PGNUM(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_COW)))
-		panic("not copy-on-write");
+		panic("%08x, not copy-on-write", addr);
 
 	addr = ROUNDDOWN(addr, PGSIZE);
 	if (sys_page_alloc(0, PFTEMP, PTE_W|PTE_U|PTE_P) < 0)

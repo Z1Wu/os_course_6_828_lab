@@ -68,7 +68,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
             panic("error occur %d", ret);
         }
         // 到这里说明目前对应的进程没有期望接收信息
-        cprintf("target %d don't expect receive massage give up cpu\n", to_env);
+        // cprintf("target %d don't expect receive massage give up cpu\n", to_env);
         sys_yield(); 
     }
 	panic("ipc_send not implemented");
@@ -82,7 +82,9 @@ ipc_find_env(enum EnvType type)
 {
 	int i;
 	for (i = 0; i < NENV; i++)
-		if (envs[i].env_type == type)
-			return envs[i].env_id;
+		if (envs[i].env_type == type){
+            // cprintf("%d -- %d \n", envs[i].env_id, envs[i].env_type);
+            return envs[i].env_id;
+        }
 	return 0;
 }

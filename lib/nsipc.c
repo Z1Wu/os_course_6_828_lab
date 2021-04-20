@@ -24,6 +24,8 @@ nsipc(unsigned type)
 
 	if (debug)
 		cprintf("[%08x] nsipc %d\n", thisenv->env_id, type);
+	// panic("[%08x] nsipc %d, %d\n", thisenv->env_id, type, nsenv);
+
 
 	ipc_send(nsenv, type, &nsipcbuf, PTE_P|PTE_W|PTE_U);
 	return ipc_recv(NULL, NULL, NULL);

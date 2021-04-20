@@ -453,6 +453,14 @@ sys_try_send_packet(void* packet, uint32_t size)
     return send_one_packet(packet, size);
 }
 
+static int
+sys_try_recv_packet(void* packet, uint32_t size)
+{
+	// LAB 6: Your code here.
+    user_mem_assert(curenv, (void*)packet, size, PTE_U | PTE_P);
+    return e1000_receive_one_packet(packet, size);
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -498,6 +506,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return sys_time_msec();
         case SYS_send_packet:
             return sys_try_send_packet((char *)a1, (uint32_t)a2);
+        case SYS_recv_packet:
+            return sys_try_recv_packet((char *)a1, (uint32_t)a2);
         default:
             return -E_INVAL;
 	}

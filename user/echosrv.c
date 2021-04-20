@@ -46,8 +46,11 @@ umain(int argc, char **argv)
 	int received = 0;
 
 	// Create the TCP socket
-	if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-		die("Failed to create socket");
+	if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		panic("%d", serversock);
+		// die("Failed to create socket");
+		// die("Failed to create socket");
+	}
 
 	cprintf("opened socket\n");
 

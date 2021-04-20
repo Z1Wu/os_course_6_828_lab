@@ -125,7 +125,9 @@ devsock_stat(struct Fd *fd, struct Stat *stat)
 int
 socket(int domain, int type, int protocol)
 {
+	
 	int r;
+	// panic("open socket");
 	if ((r = nsipc_socket(domain, type, protocol)) < 0)
 		return r;
 	return alloc_sockfd(r);

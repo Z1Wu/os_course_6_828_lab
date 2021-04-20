@@ -188,6 +188,7 @@ serve_thread(uint32_t a) {
 	struct st_args *args = (struct st_args *)a;
 	union Nsipc *req = args->req;
 	int r;
+	// cprintf(":::recevive request %d\n", args->reqno);
 
 	switch (args->reqno) {
 	case NSREQ_ACCEPT:
@@ -274,6 +275,10 @@ serve(void) {
 		if (debug) {
 			cprintf("ns req %d from %08x\n", reqno, whom);
 		}
+		// if(reqno != NSREQ_TIMER) {
+		// 	panic("ns req %d from %08x\n", reqno, whom);
+		// }
+
 
 		// first take care of requests that do not contain an argument page
 		if (reqno == NSREQ_TIMER) {
